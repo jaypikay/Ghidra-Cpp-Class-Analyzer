@@ -43,8 +43,17 @@ public class TypeInfoUtils {
 
     private static Data createString(Program program, Address address) {
         try {
+			Integer id = null;
+			if (program.getCurrentTransaction() == null) {
+				id = program.startTransaction("creating string at "+address.toString());
+			}
             DataType dt = new TerminatedStringDataType();
-            return createData(program, address, dt, -1, false, ClearDataMode.CLEAR_ALL_CONFLICT_DATA);
+            Data data = createData(
+				program, address, dt, -1, false, ClearDataMode.CLEAR_ALL_CONFLICT_DATA);
+			if (id != null) {
+				program.endTransaction(id, true);
+			}
+			return data;
         } catch (CodeUnitInsertionException e) {
             return null;
         }
@@ -295,35 +304,22 @@ public class TypeInfoUtils {
     }
 
     /**
-     * Attempts to fetch the TypeInfo instance referenced by the provided relocation
-     * @param program the program containing the relocation
-     * @param reloc the relocation
-     * @return a TypeInfo instance if the relocation can be resolved
-     */
-    public static TypeInfo getExternalTypeInfo(Program program, Relocation reloc) {
-		Program extProgram = GnuUtils.getExternalProgram(program, reloc);
-		if (extProgram != null) {
-			SymbolTable table = extProgram.getSymbolTable();
-			for (Symbol symbol : table.getSymbols(reloc.getSymbolName())) {
-				if (TypeInfoFactory.isTypeInfo(extProgram, symbol.getAddress())) {
-					return TypeInfoFactory.getTypeInfo(extProgram, symbol.getAddress());
+	 * Attempts to fetch the TypeInfo instance referenced by the provided relocation
+	 * @param program the program containing the relocation
+	 * @param reloc the relocation
+	 * @return a TypeInfo instance if the relocation can be resolved
+	 */
+	public static TypeInfo getExternalTypeInfo(Program program, Relocation reloc) {
+			Program extProgram = GnuUtils.getExternalProgram(program, reloc);
+			if (extProgram != null) {
+				SymbolTable table = extProgram.getSymbolTable();
+				for (Symbol symbol : table.getSymbols(reloc.getSymbolName())) {
+					if (TypeInfoFactory.isTypeInfo(extProgram, symbol.getAddress())) {
+						return TypeInfoFactory.getTypeInfo(extProgram, symbol.getAddress());
+					}
 				}
 			}
-		}
-		String name = reloc.getSymbolName();
-		StringBuilder msg = new StringBuilder("External TypeInfo symbol ");
-		if (name != null) {
-			DemangledObject demangled = demangle(name);
-			if (demangled != null) {
-				msg.append(demangled.getSignature(true));
-			} else {
-				msg.append(name);   
-			}
-		}
-		msg.append(" at ")
-		.append(reloc.getAddress().toString())
-		.append(" could not be resolved");
-		return null;
+			return new ExternalClassTypeInfo(program, reloc);
     }
 
 }
